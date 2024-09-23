@@ -5,6 +5,7 @@ import os
 import json
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import pprint
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -29,15 +30,17 @@ with open('config.json', 'r') as file:
 
 OWM_API_KEY= config['OWM_API_KEY'] # generate from api.openweathermap.org
 
-def send_email(subject, body, sender, recipients, password):
-    msg = MIMEText(body)
+def send_email(subject, body, sender_name, sender_email, recipients, password):
+    msg = MIMEMultipart()
     msg['Subject'] = subject
-    msg['From'] = sender
+    msg['From'] = f'{sender_name} <{sender_email}>'
     msg['To'] = ', '.join(recipients)
+    msg.attach(MIMEText(body, 'plain'))
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
-       smtp_server.login(sender, password)
-       smtp_server.sendmail(sender, recipients, msg.as_string())
-    print("Message sent!")
+       smtp_server.login(sender_email, password)
+       smtp_server.sendmail(sender_email, recipients, msg.as_string())
+    print("Message sent:")
+    print(msg)
 
 def get_hourly_report(latitude, longitude):
     weather_params = {
@@ -55,6 +58,7 @@ def get_hourly_report(latitude, longitude):
 
 def if_will_rain(latitude, longitude):
     weather_data = get_hourly_report(latitude, longitude)
+    dprint(weather_data)
     will_rain_after_hour={}
     will_rain_after_hour["timezone"] = weather_data["timezone"]
     for hour_count, hour_data in enumerate(weather_data["hourly"]):
@@ -65,16 +69,21 @@ def if_will_rain(latitude, longitude):
 
 
 def send_rain_email(will_rain_after_hour, recipients):
+    dprint(will_rain_after_hour)
     rain_time = ""
     body = ""
     timezone = will_rain_after_hour["timezone"]
+    will_rain = False
     for rain_hour, hour_data in will_rain_after_hour.items():
         if rain_hour != "timezone":
             rain_time =  rain_time + " "+ str(rain_hour)
+            print(rain_hour, hour_data)
             readable_rain_time = convert_timestamp_to_readable(hour_data["dt"], timezone)
             body += readable_rain_time  + "\n" + pprint.pformat(hour_data) + "\n"
+            will_rain = True
     #dprint(body)
-    send_email("Rain:"+rain_time, body, config['sender'], recipients, config['G_app_passwd'])
+    if will_rain :
+        send_email("Rain:"+rain_time, body, config['sender_name'], config['sender_email'], recipients, config['G_app_passwd'])
 
 
 def rain_alert(latitude, longitude, recipients):
