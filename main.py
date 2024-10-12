@@ -13,6 +13,8 @@ import pprint
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+hour_limit = 24 # choose how many hour you want to predict
+
 def dprint(var, msg=""):
     #print("debug: ", msg, var)
     pass
@@ -73,6 +75,8 @@ def if_will_rain(latitude, longitude):
     loc_timezone = weather_data["timezone"]
     for hour_count, hour_data in enumerate(weather_data["hourly"]):
         condition_code = hour_data["weather"][0]["id"]
+        if hour_count >= hour_limit :
+            break
         if int(condition_code) < 700:
             will_rain_after_hour[hour_count] = hour_data
     return will_rain_after_hour, loc_timezone
@@ -107,7 +111,6 @@ def get_rain_periods(will_rain_after_hour) :
 
 def send_rain_email(will_rain_after_hour, loc_timezone, r):
     dprint(will_rain_after_hour)
-    rain_time = ""
     body = ""
     timezone = loc_timezone
     rain_periods_in_hour, rain_periods_exact_time = get_rain_periods(will_rain_after_hour)
