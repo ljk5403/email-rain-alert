@@ -5,6 +5,7 @@
   "sender_email": "",
   "recipients": [
     {
+      "enabled" : false,
       "location_name": "", // help identify where and who
       "latitude": "",
       "longitude": "",

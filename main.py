@@ -1,5 +1,6 @@
 # corntab:
-# 0 */12 * * * ~/email-rain-alert/main.py
+# 0 22 * * * ~/email-rain-alert/main.py
+# 0 6 * * * ~/email-rain-alert/main.py
 import requests
 import os
 import json
@@ -23,7 +24,7 @@ def convert_timestamp_to_readable(timestamp, timezone_name):
     dt_local = dt_utc.astimezone(ZoneInfo(timezone_name))
     
     # Return the readable format
-    return dt_local.strftime('%Y-%m-%d %H:%M:%S %Z%z')
+    return dt_local.strftime('%Y-%m-%d %H:%M:%S') # if want timezone, add  %Z%z
 
 # Load the JSON configuration file
 with open('config.json', 'r') as file:
@@ -74,45 +75,78 @@ def if_will_rain(latitude, longitude):
             will_rain_after_hour[hour_count] = hour_data
     return will_rain_after_hour, loc_timezone
 
+def get_rain_periods(will_rain_after_hour) :
+    """
+    Want: rain_periods in two forms: after how many hours, and exact time(human readable)
+    """
+    rain_periods_in_hour = []
+    rain_periods_exact_time  = []
+    period = {"start": {}, "end": {}}
+    for rain_hour, hour_data in will_rain_after_hour.items():
+        if period["start"] == {} :
+            period["start"]["hour"] = rain_hour
+            period["end"]["hour"] = rain_hour
+            period["start"]["time"] = hour_data["dt"]
+            period["end"]["time"] = hour_data["dt"]
+            continue            
+        if rain_hour - period["start"]["hour"] <= 1 :
+            period["end"]["hour"] =rain_hour
+            period["end"]["time"] = hour_data["dt"]
+        else :
+            rain_periods_in_hour.append((period["start"]["hour"], period["end"]["hour"]))
+            rain_periods_exact_time.append((period["start"]["time"], period["end"]["time"]))
+            period = {"start": {}, "end": {}}
+    # at the end, if the period was not cleaned, it means that this last period was not record
+    if (period["start"]) != {} : 
+        rain_periods_in_hour.append((period["start"]["hour"], period["end"]["hour"]))
+        rain_periods_exact_time.append((period["start"]["time"], period["end"]["time"]))
+    return rain_periods_in_hour, rain_periods_exact_time
 
-def send_rain_email(will_rain_after_hour, location_name, latitude, longitude, loc_timezone, recipients):
+            
+
+def send_rain_email(will_rain_after_hour, loc_timezone, r):
     dprint(will_rain_after_hour)
     rain_time = ""
     body = ""
     timezone = loc_timezone
-    for rain_hour, hour_data in will_rain_after_hour.items():
-        rain_time =  rain_time + " "+ str(rain_hour)
-        print(rain_hour, hour_data)
-        readable_rain_time = convert_timestamp_to_readable(hour_data["dt"], timezone)
-        body += "<b>" + readable_rain_time  + "</b> <br>" + pprint.pformat(hour_data) + "<br>"
+    rain_periods_in_hour, rain_periods_exact_time = get_rain_periods(will_rain_after_hour)
+    for time_period in rain_periods_exact_time :
+        body += "<b>" \
+            + convert_timestamp_to_readable(time_period[0], timezone) \
+            + "--" + convert_timestamp_to_readable(time_period[1], timezone) \
+            + "</b> <br>"                     
+    body += "<br><b>Raw data:</b><br>" + pprint.pformat(will_rain_after_hour).replace('\n', '<br>')
     ## Add a link to other source (US GOV)
-    body += "<b>Other reference:</b> <br>"
-    body += "https://forecast.weather.gov/MapClick.php?lon=" + longitude + "&lat=" + latitude
-    send_email(location_name + " 雨:"+rain_time, body,
-         config['sender_name'], config['sender_email'], recipients, config['G_app_passwd'])
+    body += "<br><b>Other reference:</b> <br>"
+    body += "https://forecast.weather.gov/MapClick.php?lon=" + r["longitude"] + "&lat=" + r["latitude"]
+    send_email(r["location_name"] + " 雨:" + str(rain_periods_in_hour), body,
+         config['sender_name'], config['sender_email'], r["recipients_email"], config['G_app_passwd'])
 
 
-def rain_alert(location_name, latitude, longitude, recipients):
-    will_rain_after_hour, loc_timezone = if_will_rain(latitude, longitude)
-    if will_rain_after_hour:
-        send_rain_email(will_rain_after_hour, location_name, latitude, longitude, loc_timezone, recipients)
+def rain_alert(r):
+    will_rain_after_hour, loc_timezone = if_will_rain(r["latitude"], r["longitude"])
+    testing = False ## Enable if need test
+    if will_rain_after_hour or ( r["tester"] and testing ) :
+        send_rain_email(will_rain_after_hour, loc_timezone, r)
 
 
-def test_rain_alert(location_name, latitude, longitude, recipients):
-    will_rain_after_hour, loc_timezone = if_will_rain(latitude, longitude)
-    send_rain_email(will_rain_after_hour, location_name, latitude, longitude, loc_timezone, recipients)
-
+testing = False ## Enable if need test
 
 if __name__=="__main__":
     for recipient in recipients:
-        location_name = recipient.get("location_name")
-        latitude = recipient.get("latitude")
-        longitude = recipient.get("longitude")
-        recipients_email = recipient.get("recipients_email", [])  # List of emails
-        if latitude != "" :
-            rain_alert(location_name, latitude, longitude, recipients_email)
-            ## Enable if need test 
-            if recipient.get("tester") : test_rain_alert(location_name, latitude, longitude, recipients_email)
+        r = recipient
+        if r["enabled"] :
+            rain_alert(r)
+
+
+"""
+Logic:
+Read every recipient info
+Check if will rain
+Send email if will rain, customize everything by preference
+
+
+"""
 
 
 
