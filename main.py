@@ -1,6 +1,7 @@
-# corntab:
-# 0 22 * * * ~/email-rain-alert/main.py
-# 0 6 * * * ~/email-rain-alert/main.py
+"""corntab:
+    0 21 * * * ~/email-rain-alert/main.py
+    0 6 * * * ~/email-rain-alert/main.py
+"""
 import requests
 import os
 import json
@@ -13,7 +14,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 def dprint(var, msg=""):
-    print("debug: ", msg, var)
+    #print("debug: ", msg, var)
+    pass
 
 
 def convert_timestamp_to_readable(timestamp, timezone_name):
@@ -101,7 +103,6 @@ def get_rain_periods(will_rain_after_hour) :
         rain_periods_in_hour.append((period["start"]["hour"], period["end"]["hour"]))
         rain_periods_exact_time.append((period["start"]["time"], period["end"]["time"]))
     return rain_periods_in_hour, rain_periods_exact_time
-
             
 
 def send_rain_email(will_rain_after_hour, loc_timezone, r):
@@ -115,17 +116,20 @@ def send_rain_email(will_rain_after_hour, loc_timezone, r):
             + convert_timestamp_to_readable(time_period[0], timezone) \
             + "--" + convert_timestamp_to_readable(time_period[1], timezone) \
             + "</b> <br>"                     
-    body += "<br><b>Raw data:</b><br>" + pprint.pformat(will_rain_after_hour).replace('\n', '<br>')
     ## Add a link to other source (US GOV)
     body += "<br><b>Other reference:</b> <br>"
-    body += "https://forecast.weather.gov/MapClick.php?lon=" + r["longitude"] + "&lat=" + r["latitude"]
-    send_email(r["location_name"] + " 雨:" + str(rain_periods_in_hour), body,
+    body += "https://forecast.weather.gov/MapClick.php?lon=" + r["longitude"] + "&lat=" + r["latitude"] + "<br>"
+    ## Raw data             
+    body += "<br><b>Raw data:</b><br>" + pprint.pformat(will_rain_after_hour).replace('\n', '<br>')
+    rain_periods_in_hour_str = " "
+    for p in rain_periods_in_hour :
+        rain_periods_in_hour_str += str(p[0]) + "-" + str(p[1]) + " "
+    send_email(r["location_name"] + " 雨:" + rain_periods_in_hour_str   , body,
          config['sender_name'], config['sender_email'], r["recipients_email"], config['G_app_passwd'])
 
 
 def rain_alert(r):
     will_rain_after_hour, loc_timezone = if_will_rain(r["latitude"], r["longitude"])
-    testing = False ## Enable if need test
     if will_rain_after_hour or ( r["tester"] and testing ) :
         send_rain_email(will_rain_after_hour, loc_timezone, r)
 

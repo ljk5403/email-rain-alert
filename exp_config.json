@@ -6,10 +6,12 @@
   "recipients": [
     {
       "enabled" : false,
-      "location_name": "", // help identify where and who
-      "latitude": "",
-      "longitude": "",
-      "recipients_email": []
+      "user" : "",
+      "tester" : false,
+      "location_name": "",// help identify where and who
+      "latitude" : "",
+      "longitude" : "",
+      "recipients_email" : []
     }
   ]
 }
