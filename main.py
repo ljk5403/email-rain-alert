@@ -3,6 +3,7 @@
 import requests
 import os
 import json
+import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -26,7 +27,14 @@ def convert_timestamp_to_readable(timestamp, timezone_name):
 
 # Load the JSON configuration file
 with open('config.json', 'r') as file:
-    config = json.load(file)
+    json_str = re.sub(r'//.*', '', file.read()) # remove "//" comments in JSON
+    config = json.loads(json_str)
+    owm_api_key = config.get("OWM_API_KEY")
+    g_app_passwd = config.get("G_app_passwd")
+    sender_name = config.get("sender_name")
+    sender_email = config.get("sender_email")
+    recipients = config.get("recipients", [])  # List of recipients (default to empty list if not found)
+
 
 OWM_API_KEY= config['OWM_API_KEY'] # generate from api.openweathermap.org
 
@@ -35,7 +43,7 @@ def send_email(subject, body, sender_name, sender_email, recipients, password):
     msg['Subject'] = subject
     msg['From'] = f'{sender_name} <{sender_email}>'
     msg['To'] = ', '.join(recipients)
-    msg.attach(MIMEText(body, 'plain'))
+    msg.attach(MIMEText(body, 'html '))
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
        smtp_server.login(sender_email, password)
        smtp_server.sendmail(sender_email, recipients, msg.as_string())
@@ -47,52 +55,64 @@ def get_hourly_report(latitude, longitude):
             "lat": latitude,
             "lon": longitude,
             "appid": OWM_API_KEY,
-            "exclude": "current,minutely,daily,alerts", #TODO:?????
+            "exclude": "current,minutely,daily,alerts",
     }
     response = requests.get(url="https://api.openweathermap.org/data/3.0/onecall", params=weather_params)
     response.raise_for_status()
     weather_data = response.json()
     return weather_data
 
-#get_hourly_report(43.0876626, -89.3743042)
 
 def if_will_rain(latitude, longitude):
     weather_data = get_hourly_report(latitude, longitude)
     dprint(weather_data)
     will_rain_after_hour={}
-    will_rain_after_hour["timezone"] = weather_data["timezone"]
+    loc_timezone = weather_data["timezone"]
     for hour_count, hour_data in enumerate(weather_data["hourly"]):
         condition_code = hour_data["weather"][0]["id"]
         if int(condition_code) < 700:
             will_rain_after_hour[hour_count] = hour_data
-    return will_rain_after_hour
+    return will_rain_after_hour, loc_timezone
 
 
-def send_rain_email(will_rain_after_hour, recipients):
+def send_rain_email(will_rain_after_hour, location_name, latitude, longitude, loc_timezone, recipients):
     dprint(will_rain_after_hour)
     rain_time = ""
     body = ""
-    timezone = will_rain_after_hour["timezone"]
-    will_rain = False
+    timezone = loc_timezone
     for rain_hour, hour_data in will_rain_after_hour.items():
-        if rain_hour != "timezone":
-            rain_time =  rain_time + " "+ str(rain_hour)
-            print(rain_hour, hour_data)
-            readable_rain_time = convert_timestamp_to_readable(hour_data["dt"], timezone)
-            body += readable_rain_time  + "\n" + pprint.pformat(hour_data) + "\n"
-            will_rain = True
-    #dprint(body)
-    if will_rain :
-        send_email("Rain:"+rain_time, body, config['sender_name'], config['sender_email'], recipients, config['G_app_passwd'])
+        rain_time =  rain_time + " "+ str(rain_hour)
+        print(rain_hour, hour_data)
+        readable_rain_time = convert_timestamp_to_readable(hour_data["dt"], timezone)
+        body += "<b>" + readable_rain_time  + "</b> <br>" + pprint.pformat(hour_data) + "<br>"
+    ## Add a link to other source (US GOV)
+    body += "<b>Other reference:</b> <br>"
+    body += "https://forecast.weather.gov/MapClick.php?lon=" + longitude + "&lat=" + latitude
+    send_email(location_name + " 雨:"+rain_time, body,
+         config['sender_name'], config['sender_email'], recipients, config['G_app_passwd'])
 
 
-def rain_alert(latitude, longitude, recipients):
-    will_rain_after_hour = if_will_rain(latitude, longitude)
+def rain_alert(location_name, latitude, longitude, recipients):
+    will_rain_after_hour, loc_timezone = if_will_rain(latitude, longitude)
     if will_rain_after_hour:
-        send_rain_email(will_rain_after_hour, recipients)
+        send_rain_email(will_rain_after_hour, location_name, latitude, longitude, loc_timezone, recipients)
 
-#TODO: move location and recipients to config.json
-rain_alert(43.0876626, -89.3743042, ["lijiankun5403@gmail.com"]) # Madison
+
+def test_rain_alert(location_name, latitude, longitude, recipients):
+    will_rain_after_hour, loc_timezone = if_will_rain(latitude, longitude)
+    send_rain_email(will_rain_after_hour, location_name, latitude, longitude, loc_timezone, recipients)
+
+
+if __name__=="__main__":
+    for recipient in recipients:
+        location_name = recipient.get("location_name")
+        latitude = recipient.get("latitude")
+        longitude = recipient.get("longitude")
+        recipients_email = recipient.get("recipients_email", [])  # List of emails
+        if latitude != "" :
+            rain_alert(location_name, latitude, longitude, recipients_email)
+            ## Enable if need test 
+            if recipient.get("tester") : test_rain_alert(location_name, latitude, longitude, recipients_email)
 
 
 
