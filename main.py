@@ -95,7 +95,7 @@ def get_rain_periods(will_rain_after_hour) :
             period["start"]["time"] = hour_data["dt"]
             period["end"]["time"] = hour_data["dt"]
             continue            
-        if rain_hour - period["start"]["hour"] <= 1 :
+        if rain_hour - period["end"]["hour"] <= 1 :
             period["end"]["hour"] =rain_hour
             period["end"]["time"] = hour_data["dt"]
         else :
