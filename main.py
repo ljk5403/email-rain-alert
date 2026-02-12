@@ -88,11 +88,16 @@ def send_rain_email(will_rain_after_hour, recipients):
 
 def rain_alert(latitude, longitude, recipients):
     will_rain_after_hour = if_will_rain(latitude, longitude)
-    if will_rain_after_hour:
+    if len(will_rain_after_hour) > 1 : # it has timezone as a default key, avoiding it
         send_rain_email(will_rain_after_hour, recipients)
+        print("Rain alert sent to:", recipients)
+    else:
+        print("No rain for:", recipients)
 
-#TODO: move location and recipients to config.json
-rain_alert(43.0876626, -89.3743042, ["lijiankun5403@gmail.com"]) # Madison
+# Iterate over locations from config
+for location in config['locations']:
+    dprint(f"Checking rain for {location.get('description', 'location')}")
+    rain_alert(location['lat'], location['lon'], location['recipients'])
 
 
 
