@@ -1,6 +1,5 @@
 """corntab:
-    0 21 * * * ~/email-rain-alert/main.py
-    0 6 * * * ~/email-rain-alert/main.py
+    0 */1 * * * ~/email-rain-alert/main.py
 """
 import requests
 import os
@@ -131,18 +130,32 @@ def send_rain_email(will_rain_after_hour, loc_timezone, r):
          config['sender_name'], config['sender_email'], r["recipients_email"], config['G_app_passwd'])
 
 
-def rain_alert(latitude, longitude, recipients):
-    will_rain_after_hour = if_will_rain(latitude, longitude)
-    if len(will_rain_after_hour) > 1 : # it has timezone as a default key, avoiding it
-        send_rain_email(will_rain_after_hour, recipients)
-        print("Rain alert sent to:", recipients)
+def rain_alert(recipient):
+    latitude = recipient['lat']
+    longitude = recipient['lon']
+    will_rain_after_hour, loc_timezone = if_will_rain(latitude, longitude)
+    
+    # Check if we should run check for this recipient at this hour
+    if "check_time" in recipient:
+        # Get current hour in the location's timezone
+        dt_utc = datetime.now(ZoneInfo('UTC'))
+        dt_local = dt_utc.astimezone(ZoneInfo(loc_timezone))
+        current_hour_local = dt_local.hour
+        
+        if current_hour_local not in recipient["check_time"]:
+            print(f"Skipping {recipient.get('location_name', 'location')} because current hour {current_hour_local} (in {loc_timezone}) is not in check_time {recipient['check_time']}")
+            return
+
+    if len(will_rain_after_hour) > 1 : 
+        send_rain_email(will_rain_after_hour, loc_timezone, recipient)
+        print("Rain alert sent to:", recipient['recipients'])
     else:
-        print("No rain for:", recipients)
+        print("No rain for:", recipient['recipients'])
 
 # Iterate over locations from config
-for location in config['locations']:
-    dprint(f"Checking rain for {location.get('description', 'location')}")
-    rain_alert(location['lat'], location['lon'], location['recipients'])
+for recipient in recipients:
+    dprint(f"Checking rain for {recipient.get('location_name', 'location')}")
+    rain_alert(recipient)
 
 """
 Logic:

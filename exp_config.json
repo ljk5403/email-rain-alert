@@ -3,12 +3,17 @@
   "G_app_passwd": "",
   "sender_name": "",
   "sender_email": "",
-  "locations": [
+  "recipients": [
     {
       "lat": "",
       "lon": "",
-      "recipients": [""],
-      "description": ""
+      "recipients": [
+        ""
+      ],
+      "location_name": "",
+      "check_time": [
+        ""
+      ]
     }
   ]
 }
