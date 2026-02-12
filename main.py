@@ -1,5 +1,5 @@
 """corntab:
-    0 */1 * * * ~/email-rain-alert/main.py
+    0 */1 * * * python3 ~/email-rain-alert/main.py
 """
 import requests
 import os
