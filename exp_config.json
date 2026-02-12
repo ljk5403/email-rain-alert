@@ -1,0 +1,17 @@
+{
+  "OWM_API_KEY": "",
+  "G_app_passwd": "",
+  "sender_name": "",
+  "sender_email": "",
+  "recipients": [
+    {
+      "enabled" : false,
+      "user" : "",
+      "tester" : false,
+      "location_name": "",// help identify where and who
+      "latitude" : "",
+      "longitude" : "",
+      "recipients_email" : []
+    }
+  ]
+}
